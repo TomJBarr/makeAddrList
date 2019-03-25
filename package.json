@@ -1,0 +1,22 @@
+{
+  "name": "makeAddrList",
+  "version": "1.0.0",
+  "description": "list owners of ERC-20 tokens",
+  "main": "makeAddrList.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bn.js": "^4.11.8",
+    "buffer": "^5.2.1",
+    "ethereum-ens": "^0.7.4",
+    "ethereumjs-abi": "^0.6.6",
+    "ethereumjs-tx": "^1.3.7",
+    "ethereumjs-util": "^6.1.0",
+    "keccakjs": "^0.2.3",
+    "node-fetch": "^2.3.0",
+    "request": "^2.88.0"
+  }
+}

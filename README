@@ -1,0 +1,18 @@
+
+makeAddrList
+===========================================================================
+usage: node makeAddrList contractAddr addrListFile
+where:
+  contractAddr is the address of the ERC20 token for which you want to get
+  a list of all token holders.
+  addrListFile is the file that will get the list of token holder addresses
+
+this tool collects all transfer events from the specified contract. fyi, according to
+the ERC20 interface, the signature of the transfer event is:
+  event Transfer( address indexed from, address indexed to, uint value);
+for each from and to address the contract is queried to see if that address is
+currently an owner. all owners are added to a list. the list is then sorted, and
+duplicates are removed.
+
+look at makeAddrList.sh, which just invokes makeAddrList and sorts the addresses
+and removes duplicates (using typical linux system tools).
