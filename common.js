@@ -4,45 +4,19 @@
 const BN = require("bn.js");
 const Buffer = require('buffer/').Buffer;
 const fetch = require('node-fetch');
+const Web3 = require('web3');
 const common = module.exports = {
 
     web3: null,
     waitingForTxid: false,
 
-    //
-    // cb(err, web3)
-    // if requireAcct, then not only must mm be installed, but also an acct must be unlocked
-    //
-    checkForMetaMask: async function(requireAcct, cb) {
-	if (window.ethereum) {
-	    // Modern dapp browsers...
-            common.web3 = new Web3(ethereum);
-	    //console.error('checkForMetaMask: found new metamask');
-            try {
-		// Request account access if needed
-		await ethereum.enable();
-		cb(null, common.web3);
-	    } catch (error) {
-		// User denied account access...
-	        console.error('checkForMetaMask: err = ' + error.toString());
-		common.web3 = null;
-		cb('You must enable the MetaMask plugin to use this utility', null);
-	    }
-	} else if (typeof window.web3 !== 'undefined') {
-	    // Legacy dapp browsers...
-	    common.web3 = new Web3(web3.currentProvider);
-	    console.error('found old metamask. provider: ' + web3.currentProvider.toString());
-	    web3.version.getNetwork((err, netId) => {
-		if (!!err)
-		    cb(err,null)
-		else if (!!requireAcct && !web3.eth.accounts[0])
-		    cb('To use this utility, a MetaMask account must be unlocked', null);
-		else
-		    cb(null, common.web3);
-	    });
-	} else {
-	    common.web3 = null;
-	    cb('You must enable the MetaMask plugin to use this utility', null);
+    setupWeb3Node: function() {
+	//common.web3 = new Web3(Web3.givenProvider || 'ws://some.local-or-remote.node:8546', null, options);
+	common.web3 = new Web3(new Web3.providers.WebsocketProvider("wss://mainnet.infura.io/ws"));
+	//console.log('setupWeb3Node: common.web3.eth = ' + !!common.web3.eth);
+	if (!common.web3.eth) {
+	    console.log('error: web3.eth is null');
+	    process.exit();
 	}
     },
 
