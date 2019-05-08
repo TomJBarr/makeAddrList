@@ -1,18 +1,28 @@
 
 makeAddrList
-===========================================================================
-usage: node makeAddrList contractAddr addrListFile
-where:
-  contractAddr is the address of the ERC20 token for which you want to get
-  a list of all token holders.
-  addrListFile is the file that will get the list of token holder addresses
+===============================================================================
+This tool makes a list of all addresses that own the specified ERC20 token.
+Optionally it will list only those addresses that are registered with Turms AMT.
+Or it will simply list all addresses that are registered with Turms AMT.
 
-this tool collects all transfer events from the specified contract. fyi, according to
-the ERC20 interface, the signature of the transfer event is:
-  event Transfer( address indexed from, address indexed to, uint value);
-for each from and to address the contract is queried to see if that address is
-currently an owner. all owners are added to a list. the list is then sorted, and
-duplicates are removed.
+ usage:
+ ./makeAddrList.sh [options] <token name> <token address> <output_file>
 
-look at makeAddrList.sh, which just invokes makeAddrList and sorts the addresses
-and removes duplicates (using typical linux system tools).
+  <token address>   is the address of the ERC20 token for which you want to get
+                    a list of all token holders.
+  <output file>     is the file that will get the list of token holder addresses
+
+ options are:
+ -h                 causes this message to be displayed. alternate form --help.
+ -v                 causes us to be verbose. If this option is specified,
+                    extra, explanitory messages might be displayed.
+                    an alternate form for this option is --verbose.
+ --only-turms       only display addresses that are registered with Turms AMT.
+ --all-turms        display all addresses that are registered with Turms AMT.
+                    this implies --only-turms. also no other parameters should
+                    be specified, except output file.
+
+eg:
+ ./makeAddrList.sh OWN 0x1460a58096d80a50a2F1f956DDA497611Fa4f165 OWN_addr_list.txt
+or
+ ./makeAddrList.sh --all-turms all_turms_addr_list.txt
