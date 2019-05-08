@@ -11,6 +11,7 @@ VERBOSE=""
 TOKEN_NAME=""
 TOKEN_ADDR=""
 OUTPUT_FILE=""
+ALL_TURMS=""
 ONLY_TURMS=""
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -19,8 +20,11 @@ while [ $# -gt 0 ]; do
     -v)               VERBOSE="Yes";;
     --verbose)        VERBOSE="Yes";;
     --only-turms)     ONLY_TURMS="Yes";;
+    --all-turms)      ALL_TURMS="Yes";;
     *)
-    if [ -z "$TOKEN_NAME" ]; then
+    if [ -n "$ALL_TURMS" ]; then
+	OUTPUT_FILE="$1"
+    elif [ -z "$TOKEN_NAME" ]; then
 	TOKEN_NAME="$1"
     elif [ -z "$TOKEN_ADDR" ]; then
 	TOKEN_ADDR="$1"
@@ -37,7 +41,9 @@ done
 # -------------------------------------------------------------------------
 # help message code
 # -------------------------------------------------------------------------
-if [ -n "$DSP_HELP" -o -z "$TOKEN_NAME" -o -z "$TOKEN_ADDR" -o -z "$OUTPUT_FILE" ]; then
+if [[ ("$DSP_HELP" != ""                                                                         ) ||
+      ("$ALL_TURMS" == "" && ("$TOKEN_NAME" == "" || "$TOKEN_ADDR" == "" || "$OUTPUT_FILE" == "")) ||
+      ("$ALL_TURMS" != "" && ("$TOKEN_NAME" != "" || "$TOKEN_ADDR" != "" || "$OUTPUT_FILE" == ""))  ]]; then
     cat <<EOF
 $NAME
 this tool makes a list of all addresses that own the specified ERC20 token.
@@ -49,9 +55,14 @@ this tool makes a list of all addresses that own the specified ERC20 token.
                     extra, explanitory messages might be displayed.
                     an alternate form for this option is --verbose.
  --only-turms       only display addresses that are registered with Turms AMT.
+ --all-turms        display all addresses that are registered with Turms AMT.
+                    this implies --only-turms. also no other parameters should
+                    be specified, except output file.
 
 eg:
  ./makeAddrList.sh OWN 0x1460a58096d80a50a2F1f956DDA497611Fa4f165 OWN_addr_list.txt
+or
+ ./makeAddrList.sh --all-turms all_turms_addr_list.txt
 EOF
     exit 0
 fi
@@ -65,8 +76,12 @@ if [ -n "$ONLY_TURMS" ]; then
     TURMS_OPT="--only-turms"
 fi
 echo "#" > "$OUTPUT_FILE"
-echo "# list of all holders of token: $TOKEN_NAME" >> "$OUTPUT_FILE"
-echo "# token address: $TOKEN_ADDR" >> "$OUTPUT_FILE"
+if [ -n "$ALL_TURMS" ]; then
+    echo "# list of all turms addresses" >> "$OUTPUT_FILE"
+else
+    echo "# list of all holders of token: $TOKEN_NAME" >> "$OUTPUT_FILE"
+    echo "# token address: $TOKEN_ADDR" >> "$OUTPUT_FILE"
+fi
 echo "#" >> "$OUTPUT_FILE"
 if [ -n "$VERBOSE" ]; then
     node makeAddrList "$TURMS_OPT" "$TOKEN_ADDR" | tee /dev/tty | sort | uniq >> "$OUTPUT_FILE"
