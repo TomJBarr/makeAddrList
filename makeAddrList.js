@@ -22,18 +22,19 @@ let showHelp = false;
 //
 process.argv.forEach(function (val, index, array) {
     if (index >= 2) {
-	if (val == '--debug')
+	if (val == '--verbose')
 	    common.SHOW_DEBUG = true;
 	else if (val == '--help')
 	    showHelp = true;
 	else if (val == '--only-turms')
 	    onlyTurmsAMT = true;
-	else if (!contractAddr)
-	    contractAddr = val;
-	else {
+	else if (!val)
+	    ; //empty is ok
+	else if (val.startsWith('--') ||  !!contractAddr) {
 	    console.error('Unknown command line parameter: ' + val);
 	    return;
-	}
+	} else
+	    contractAddr = val;
     }
     if (index >= array.length - 1)
 	main();
@@ -71,7 +72,6 @@ function makeAddrList(contractAddr, cb) {
 	transferEventTopic0 = '0x' + keccak256.digest('hex');
 	//console.error('makeAddrList: transferEventTopic0 = ' + transferEventTopic0);
 	const fromBlock = (!!onlyTurmsAMT) ? mtEther.firstBlock : 0;
-	getAllTxsNext(fromBlock, mtEther.EMT_CONTRACT_ADDR, cb);
 	getLogsNext(fromBlock, contractAddr, cb);
     } else {
 	onlyTurmsAMT = true;
@@ -94,18 +94,28 @@ function getLogsNext(fromBlock, contractAddr, cb) {
 	topics: [ transferEventTopic0 ]
     };
     //console.log('getLogsNext: fromBlock = ' + fromBlock);
+    if (!!common.SHOW_DEBUG)
+	console.error('getting logs from contract: ' + contractAddr + ' from block ' + fromBlock);
     ether.getLogs(options, function(err, eventResults) {
 	if (!!err || !eventResults || eventResults.length == 0) {
 	    if (!!err)
 		console.error('makeAddrList: ether.getLogs err = ' + err);
 	    //either an error, or maybe just no events
+	    cb();
 	    return;
 	}
-	parseLogResults(fromBlock, eventResults, 0, function(lastBlock) {
+	if (!eventResults || !eventResults.length) {
+	    if (!!common.SHOW_DEBUG)
+		console.error('no additional events');
+	    cb();
+	    return;
+	}
+	parseLogResults(fromBlock, eventResults, function(lastBlock) {
 	    if (lastBlock != fromBlock)
 		getLogsNext(lastBlock, contractAddr, cb);
 	    else {
-		//console.log('getLogsNext: fromBlock = ' + fromBlock + '; done');
+		if (!!common.SHOW_DEBUG)
+		    console.error('parsed to block ' + lastBlock);
 		cb();
 	    }
 	});
@@ -115,27 +125,32 @@ function getLogsNext(fromBlock, contractAddr, cb) {
 
 //
 // cb(lastBlock)
-// recursive fcn to parse passed idx of log event
+// fcn to parse passed log events
 // if addr is registered w/ turms (or if not necessary) then prints addr
 //
-function parseLogResults(fromBlock, eventResults, idx, cb) {
+async function parseLogResults(fromBlock, eventResults, cb) {
     //console.log('parseLogResults: fromBlock = ' + fromBlock + ', idx = ' + idx);
-    if (idx >= eventResults.length) {
-	cb(fromBlock);
-    } else {
+    let blockNumber = fromBlock;
+    if (!!common.SHOW_DEBUG)
+	console.error('from block ' + fromBlock + ' parsing ' + eventResults.length + ' results');
+    for (idx = 0; idx < eventResults.length; ++idx) {
 	const result = eventResults[idx];
-	const blockNumber = parseInt(result.blockNumber);
+	const thisBlock = parseInt(result.blockNumber);
+	if (thisBlock > blockNumber)
+	    blockNumber = thisBlock;
 	//first 2 chars are '0x'; we want rightmost 20 out of 32 bytes
 	const fromAddr = '0x' + result.topics[1].substring(2 + 12*2);
 	const toAddr = '0x' + result.topics[2].substring(2 + 12*2);
-	//console.log(fromAddr);
-	checkTurmsRegistration(toAddr, function(isTurms) {
-	    if (isTurms)
-		console.log(toAddr);
-	    const lastBlock = (blockNumber > fromBlock) ? blockNumber : fromBlock;
-	    parseLogResults(lastBlock, eventResults, idx + 1, cb);
-	});
+	if (!!common.SHOW_DEBUG)
+	    console.error(idx + ': ' + fromAddr);
+	else
+	    process.stderr.write('.');
+	const isTurms = await checkTurmsRegistration(fromAddr);
+	if (isTurms)
+	    console.log(fromAddr);
     }
+    console.error('');
+    cb(blockNumber);
 }
 
 
@@ -174,6 +189,8 @@ function parseLogResults(fromBlock, eventResults, idx, cb) {
 function getAllTxsNext(fromBlock, contractAddr, cb) {
     let url = 'https://api.etherscan.io/api?module=account&action=txlist&address=ADDRESS&startblock=STARTBLOCK&endblock=99999999&page=1&offset=1000&sort=asc';
     url = url.replace('ADDRESS', contractAddr).replace('STARTBLOCK', fromBlock.toString());
+    if (!!common.SHOW_DEBUG)
+	console.error('getting transactions to contract: ' + contractAddr + ' from block ' + fromBlock);
     common.fetch(url, null, function(str, err) {
 	if (!!err) {
 	    console.log('getAllTxsNext: error retreiving transactions: ' + err);
@@ -182,11 +199,18 @@ function getAllTxsNext(fromBlock, contractAddr, cb) {
 	}
 	const response = JSON.parse(str);
 	const txResults = response.result;
-	parseTxResults(fromBlock, txResults, 0, function(lastBlock) {
+	if (!txResults || !txResults.length) {
+	    if (!!common.SHOW_DEBUG)
+		console.error('no additional results');
+	    cb();
+	    return;
+	}
+	parseTxResults(fromBlock, txResults, function(lastBlock) {
 	    if (lastBlock != fromBlock)
-		getLogsNext(lastBlock, contractAddr, cb);
+		getAllTxsNext(lastBlock, contractAddr, cb);
 	    else {
-		//console.log('getLogsNext: fromBlock = ' + fromBlock + '; done');
+		if (!!common.SHOW_DEBUG)
+		    console.error('parsed to block ' + lastBlock);
 		cb();
 	    }
 	});
@@ -196,40 +220,47 @@ function getAllTxsNext(fromBlock, contractAddr, cb) {
 
 //
 // cb(lastBlock)
-// recursive fcn to parse passed idx of ttransactions list
+// fcn to parse passed transactions list
 // if addr is registered w/ turms (or if not necessary) then prints addr
 //
-function parseTxResults(fromBlock, txResults, idx, cb) {
+async function parseTxResults(fromBlock, txResults, cb) {
     //console.log('parseTxResults: fromBlock = ' + fromBlock + ', idx = ' + idx);
-    if (idx >= txResults.length) {
-	cb(fromBlock);
-    } else {
+    let blockNumber = fromBlock;
+    if (!!common.SHOW_DEBUG)
+	console.error('from block ' + fromBlock + ' parsing ' + txResults.length + ' results');
+    for (idx = 0; idx < txResults.length; ++idx) {
 	const result = txResults[idx];
-	const blockNumber = parseInt(result.blockNumber);
+	const thisBlock = parseInt(result.blockNumber);
+	if (thisBlock > blockNumber)
+	    blockNumber = thisBlock;
 	const fromAddr = result.from;
-	checkTurmsRegistration(fromAddr, function(isTurms) {
-	    if (isTurms)
-		console.log(fromAddr);
-	    const lastBlock = (blockNumber > fromBlock) ? blockNumber : fromBlock;
-	    parseTxResults(lastBlock, txResults, idx + 1, cb);
-	});
+	if (!!common.SHOW_DEBUG)
+	    console.error(idx + ': ' + fromAddr);
+	else
+	    process.stderr.write('.');
+	const isTurms = await checkTurmsRegistration(fromAddr);
+	if (isTurms)
+	    console.log(fromAddr);
     }
+    console.error('');
+    cb(blockNumber);
 }
 
 
-// cb(isTurms)
-// cb indicates true if turms registration is not required, or if addr is registered w/ turms
-function checkTurmsRegistration(addr, cb) {
-    //console.log('checkTurmsRegistration: addr = ' + addr);
-    if (!onlyTurmsAMT) {
-	cb(true);
-    } else {
-	mtEther.accountQuery(addr, function(err, acctInfo) {
-	    if (!!err) {
-		console.log(err)
-		process.exit();
-	    }
-	    cb(acctInfo.isValid);
-	});
-    }
+var checkTurmsRegistration = function(addr) {
+    return new Promise(function(resolve, reject) {
+	if (!onlyTurmsAMT) {
+	    resolve(true);
+	} else {
+	    mtEther.accountQuery(addr, function(err, acctInfo) {
+		if (!!err) {
+		    console.log(err)
+		    process.exit();
+		}
+		if (!acctInfo)
+		    console.error(addr + ': acctInfo = ' + acctInfo);
+		resolve(!!acctInfo && acctInfo.isValid);
+	    });
+	}
+    });
 }

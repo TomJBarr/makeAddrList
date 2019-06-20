@@ -18,21 +18,26 @@ while [ $# -gt 0 ]; do
     -h)               DSP_HELP="Yes";;
     --help)           DSP_HELP="Yes";;
     -v)               VERBOSE="Yes";;
+    --debug)          VERBOSE="Yes";;
     --verbose)        VERBOSE="Yes";;
     --only-turms)     ONLY_TURMS="Yes";;
     --all-turms)      ALL_TURMS="Yes";;
     *)
-    if [ -n "$ALL_TURMS" ]; then
-	OUTPUT_FILE="$1"
-    elif [ -z "$TOKEN_NAME" ]; then
-	TOKEN_NAME="$1"
-    elif [ -z "$TOKEN_ADDR" ]; then
-	TOKEN_ADDR="$1"
-    elif [ -z "$OUTPUT_FILE" ]; then
-	OUTPUT_FILE="$1"
-    else
-	DSP_HELP="Yes"
-    fi;;
+	if [ -n "$ALL_TURMS" ]; then
+	    if [ -z "$OUTPUT_FILE" ]; then
+		OUTPUT_FILE="$1"
+	    else
+		DSP_HELP="Yes"
+	    fi
+	elif [ -z "$TOKEN_NAME" ]; then
+	    TOKEN_NAME="$1"
+	elif [ -z "$TOKEN_ADDR" ]; then
+	    TOKEN_ADDR="$1"
+	elif [ -z "$OUTPUT_FILE" ]; then
+	    OUTPUT_FILE="$1"
+	else
+	    DSP_HELP="Yes"
+	fi;;
     esac
     shift
 done
@@ -75,6 +80,11 @@ TURMS_OPT=""
 if [ -n "$ONLY_TURMS" ]; then
     TURMS_OPT="--only-turms"
 fi
+VERBOSE_OPT=""
+if [ -n "$VERBOSE" ]; then
+    VERBOSE_OPT="--verbose"
+fi
+
 echo "#" > "$OUTPUT_FILE"
 if [ -n "$ALL_TURMS" ]; then
     echo "# list of all turms addresses" >> "$OUTPUT_FILE"
@@ -83,8 +93,21 @@ else
     echo "# token address: $TOKEN_ADDR" >> "$OUTPUT_FILE"
 fi
 echo "#" >> "$OUTPUT_FILE"
+ALL_ADDR_FILE=$(mktemp /tmp/makeAddrList.all.XXXXXX)
+SORT_ADDR_FILE=$(mktemp /tmp/makeAddrList.sort.XXXXXX)
 if [ -n "$VERBOSE" ]; then
-    node makeAddrList "$TURMS_OPT" "$TOKEN_ADDR" | tee /dev/tty | sort | uniq >> "$OUTPUT_FILE"
-else
-    node makeAddrList "$TURMS_OPT" "$TOKEN_ADDR" | sort | uniq >> "$OUTPUT_FILE"
+    echo "collecting addresses"
 fi
+node makeAddrList "$VERBOSE_OPT" "$TURMS_OPT" "$TOKEN_ADDR" > $ALL_ADDR_FILE
+if [ -n "$VERBOSE" ]; then
+    echo "sorting addresses"
+fi
+cat $ALL_ADDR_FILE | sort > $SORT_ADDR_FILE
+if [ -n "$VERBOSE" ]; then
+    echo "finding unique addresses"
+fi
+cat $SORT_ADDR_FILE | uniq >> "$OUTPUT_FILE"
+if [ -n "$VERBOSE" ]; then
+    echo "addresses saved to $OUTPUT_FILE"
+fi
+rm $ALL_ADDR_FILE $SORT_ADDR_FILE
