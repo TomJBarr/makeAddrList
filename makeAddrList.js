@@ -235,12 +235,14 @@ async function parseTxResults(fromBlock, txResults, cb) {
 	    blockNumber = thisBlock;
 	const fromAddr = result.from;
 	if (!!common.SHOW_DEBUG)
-	    console.error(idx + ': ' + fromAddr);
+	    process.stderr.write(idx + ': ' + fromAddr);
 	else
 	    process.stderr.write('.');
 	const isTurms = await checkTurmsRegistration(fromAddr);
 	if (isTurms)
 	    console.log(fromAddr);
+	if (!!common.SHOW_DEBUG)
+	    console.error('');
     }
     console.error('');
     cb(blockNumber);
@@ -252,10 +254,15 @@ var checkTurmsRegistration = function(addr) {
 	if (!onlyTurmsAMT) {
 	    resolve(true);
 	} else {
+	    if (!!common.SHOW_DEBUG)
+		process.stderr.write(' query');
 	    mtEther.accountQuery(addr, function(err, acctInfo) {
+		if (!!common.SHOW_DEBUG)
+		    process.stderr.write(' err = ' + err);
 		if (!!err) {
 		    console.log(err)
-		    process.exit();
+		    reject(err);
+		    //process.exit();
 		}
 		if (!acctInfo)
 		    console.error(addr + ': acctInfo = ' + acctInfo);
